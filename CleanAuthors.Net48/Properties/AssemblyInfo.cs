@@ -5,10 +5,10 @@ using System.Runtime.InteropServices;
 // Общие сведения об этой сборке предоставляются следующим набором
 // набора атрибутов. Измените значения этих атрибутов для изменения сведений,
 // связанные с этой сборкой.
-[assembly: AssemblyTitle("CleanAuthors.Net48")]
-[assembly: AssemblyDescription("Clean Microsoft Office metadata.")]
+[assembly: AssemblyTitle("Clean Authors")]
+[assembly: AssemblyDescription("Run recursively through the tree of files and clean all Microsoft Office metadata to save the privacy.")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("diev")]
+[assembly: AssemblyCompany("Cibank")]
 [assembly: AssemblyProduct("CleanAuthors.Net48")]
 [assembly: AssemblyCopyright("Copyright © Dmitrii Evdokimov 2023")]
 [assembly: AssemblyTrademark("")]
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // Можно задать все значения или принять номера сборки и редакции по умолчанию 
 // используя "*", как показано ниже:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.4.0.0")]
+[assembly: AssemblyFileVersion("1.4.0.0")]

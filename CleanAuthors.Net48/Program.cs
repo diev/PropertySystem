@@ -15,15 +15,14 @@ limitations under the License.
 */
 #endregion
 
-using Microsoft.WindowsAPICodePack.Shell;
-
 using System;
-using System.Collections.Generic;
-using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+
+using Microsoft.WindowsAPICodePack.Shell;
+using Microsoft.WindowsAPICodePack.Shell.PropertySystem;
 
 using Task = System.Threading.Tasks.Task;
 
@@ -32,12 +31,13 @@ namespace CleanAuthors.Net48
     internal class Program
     {
         //app.config
-        private static readonly string _path = GetString("Path");
-        private static readonly string[] _skips = GetStrings("Skip");
-        private static readonly string[] _masks = GetMultiString("Masks");
-        private static readonly bool _subdirs = GetBoolean("Subdirs");
-        private static readonly bool _readonly = GetBoolean("ReadOnly");
-        private static readonly string _logFileName = GetLogFileName("Logs");
+        private static readonly string _path = AppSettings.GetString("Path");
+        private static readonly string[] _skips = AppSettings.GetStrings("Skip");
+        private static readonly string[] _masks = AppSettings.GetMultiString("Masks");
+        private static readonly bool _subdirs = AppSettings.GetBoolean("Subdirs");
+        private static readonly bool _readonly = AppSettings.GetBoolean("ReadOnly");
+        private static readonly bool _logToConsole = AppSettings.GetBoolean("LogToConsole");
+        private static readonly string _logFileName = AppSettings.GetLogFileName("Logs");
 
         //counters
         private static int _level = 0;
@@ -47,167 +47,181 @@ namespace CleanAuthors.Net48
         private static int _totalClean = 0;
         private static int _totalErrors = 0;
 
-        private static readonly Queue<string> _log = new Queue<string>();
-
         private static async Task Main(string[] args)
         {
             try
             {
-                using (var stream = new FileStream(_logFileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 4096, true))
-                using (var writer = new StreamWriter(stream, Encoding.GetEncoding(1251)))
+                WriteRunStatus("Start clean");
+                Logger.Log = _logFileName;
+                Logger.WriteLine(_path);
+
+                if (!_logToConsole)
                 {
-                    bool run = true;
-                    var logger = Task.Run(async () =>
-                    {
-                        while (run)
-                        {
-                            if (_log.Count > 0)
-                            {
-                                while (_log.Count > 0)
-                                {
-                                    await writer.WriteLineAsync(_log.Dequeue());
-                                }
-
-                                await writer.FlushAsync();
-                            }
-                        }
-                    });
-
-                    var watch = Stopwatch.StartNew();
-                    _log.Enqueue(_path);
-                    await ProcessDirAsync(new DirectoryInfo(_path));
-                    watch.Stop();
-
-                    string report = string.Join(Environment.NewLine, new string[]
-                    {
-                        "",
-                        $"Execution Time: {watch.Elapsed}",
-                        $"Levels: {_totalLevels}, Dirs: {_totalDirs}, Files: {_totalFiles}, Clean: {_totalClean}, Errors: {_totalErrors}"
-                    });
-
-                    _log.Enqueue(report);
-
-                    Console.WriteLine(report);
-                    Console.WriteLine($"Log: {_logFileName}");
-
-                    run = false;
-
-                    while (_log.Count > 0)
-                    {
-                        await writer.WriteLineAsync(_log.Dequeue());
-                    }
-
-                    await writer.FlushAsync();
+                    Console.WriteLine(_path);
+                    Console.WriteLine("LogToConsole: Off");
                 }
 
+                var watch = Stopwatch.StartNew();
+
+                await ProcessDirAsync(new DirectoryInfo(_path));
+
+                watch.Stop();
+
+                string report = string.Join(Environment.NewLine, new string[]
+                {
+                    "",
+                    $"Execution Time: {watch.Elapsed}",
+                    $"Levels: {_totalLevels}, Dirs: {_totalDirs}, Files: {_totalFiles}, Clean: {_totalClean}, Errors: {_totalErrors}"
+                });
+
+                Logger.Timed = false;
+                Logger.WriteLine(report);
+
+                Console.WriteLine(report);
+                Console.WriteLine($"Log: {Logger.Log}");
+
                 //Console.ReadLine();
+                WriteRunStatus("Stop clean 0");
+                Environment.Exit(0);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
+                WriteRunStatus("Stop clean 1");
+                Environment.Exit(1);
+            }
+            finally
+            {
+                Logger.Close();
             }
         }
 
-
-        #region AppSettings
-        private static bool GetBoolean(string key)
+        private static void WriteRunStatus(string status = "Run")
         {
-            string value = ConfigurationManager.AppSettings[key];
-            return value.Equals("1");
-        }
+            string message = $"{DateTime.Now:G} {status}{Environment.NewLine}";
 
-        private static string GetString(string key)
-        {
-            return ConfigurationManager.AppSettings[key];
-        }
+            try
+            {
+                string path = AppSettings.GetString("Logs");
+                string log = Path.Combine(path, "startstop.log");
 
-        private static string[] GetMultiString(string key)
-        {
-            string value = ConfigurationManager.AppSettings[key];
-            return value.Split(';').Select(n => n.Trim()).ToArray();
+                File.AppendAllText(log, message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(message);
+                Console.WriteLine(ex.Message);
+            }
         }
-
-        private static string[] GetStrings(string key)
-        {
-            string value = ConfigurationManager.AppSettings[key];
-            return value.Split('\n').Select(n => n.Trim()).Where(n => !string.IsNullOrEmpty(n)).ToArray();
-        }
-
-        private static string GetLogFileName(string key)
-        {
-            string value = ConfigurationManager.AppSettings[key];
-            var now = DateTime.Now;
-            string path = Directory.CreateDirectory(Path.Combine(value, $"{now:yyyy}")).FullName;
-            return Path.Combine(path, $"{now:yyyyMMdd-HHmm}.log");
-        }
-        #endregion AppSettings
 
         private static async Task ProcessDirAsync(DirectoryInfo di)
         {
             _totalDirs++;
-            string path = di.FullName;
-
-            //_log.Enqueue(path);
-
-            foreach (var skip in _skips)
+            try
             {
-                if (path.StartsWith(skip))
+                string path = di.FullName;
+
+                foreach (var skip in _skips)
                 {
-                    Console.WriteLine($"{path} [skip]");
-                    return;
+                    if (path.StartsWith(skip))
+                    {
+                        Console.WriteLine($"{path} [skip]");
+                        return;
+                    }
                 }
-            }
 
-            //if (_level < 3)
-            //{
-                Console.WriteLine(path);
-            //}
-            //else if (_level == 3)
-            //{
-            //    Console.WriteLine(path + "...");
-            //}
-
-            foreach (var mask in _masks)
-            {
-                foreach (var fi in di.EnumerateFiles(mask))
+                if (_logToConsole)
                 {
-                    ProcessFile(fi);
+                    //if (_level < 3)
+                    //{
+                    Console.WriteLine(path);
+                    //}
+                    //else if (_level == 3)
+                    //{
+                    //    Console.WriteLine(path + "...");
+                    //}
                 }
-            }
 
-            while (_log.Count > 0)
-            {
-                await Task.Delay(100);
-            }
-
-            if (_subdirs)
-            {
-                _level++;
-                _totalLevels = Math.Max(_totalLevels, _level);
-
-                foreach (var sdi in di.EnumerateDirectories())
+                try
                 {
+                    foreach (var fi in _masks.SelectMany(mask => di.EnumerateFiles(mask)))
+                    {
+                        await ProcessFile(fi);
+                    }
+                }
+                catch { }
+
+                while (!Logger.IsEmpty)
+                {
+                    await Task.Delay(100);
+                }
+
+                if (_subdirs)
+                {
+                    _level++;
+                    _totalLevels = Math.Max(_totalLevels, _level);
+
                     try
                     {
-                        await ProcessDirAsync(sdi);
+                        foreach (var sdi in di.EnumerateDirectories())
+                        {
+                            try
+                            {
+                                await ProcessDirAsync(sdi);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine(e.Message);
+                            }
+                        }
                     }
-                    catch (Exception e)
-                    { 
-                        Console.WriteLine(e.Message);
-                    }
-                }
+                    catch { }
 
-                _level--;
+                    _level--;
+                }
             }
+            catch { }
         }
 
-        private static void ProcessFile(FileInfo fi)
+        private static Task ProcessFile(FileInfo fi)
         {
             _totalFiles++;
+            try
+            {
+                using (var file = ShellFile.FromFilePath(fi.FullName))
+                {
+                    var prop = file.Properties.System;
+                    try
+                    {
+                        if (prop.Author.Value != null ||
+                            prop.Category.Value != null ||
+                            prop.Comment.Value != null ||
+                            prop.Company.Value != null ||
+                            prop.ContentStatus.Value != null ||
+                            prop.Document.LastAuthor.Value != null ||
+                            prop.Document.Manager.Value != null ||
+                            prop.Keywords.Value != null ||
+                            prop.Subject.Value != null ||
+                            prop.Title.Value != null)
+                        {
+                            CleanProcessFile(fi, prop);
+                        }
+                    }
+                    catch
+                    {
+                        CleanProcessFile(fi, prop);
+                    }
+                }
+            }
+            catch { }
 
+            return Task.CompletedTask;
+        }
+
+        private static Task CleanProcessFile(FileInfo fi, ShellProperties.PropertySystem prop)
+        {
             var sb = new StringBuilder();
 
-            bool modified = false;
             bool excepted = false;
             var lastWritten = fi.LastWriteTime;
             var readOnly = fi.IsReadOnly;
@@ -224,128 +238,104 @@ namespace CleanAuthors.Net48
                 }
             }
 
-            var file = ShellFile.FromFilePath(fi.FullName);
-            var prop = file.Properties.System;
-
             try
             {
                 if (prop.Author.Value != null)
                 {
                     sb.Append($" [Author: {string.Join("; ", prop.Author.Value)}]");
-
                     prop.Author.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Category.Value != null)
                 {
                     sb.Append($" [Category: {string.Join("; ", prop.Category.Value)}]");
-
                     prop.Category.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Comment.Value != null)
                 {
                     sb.Append($" [Comment: {prop.Comment.Value}]");
-
                     prop.Comment.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Company.Value != null)
                 {
                     sb.Append($" [Company: {prop.Company.Value}]");
-
                     prop.Company.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.ContentStatus.Value != null)
                 {
                     sb.Append($" [ContentStatus: {prop.ContentStatus.Value}]");
-
                     prop.ContentStatus.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Document.LastAuthor.Value != null)
                 {
                     sb.Append($" [LastAuthor: {prop.Document.LastAuthor.Value}]");
-
                     prop.Document.LastAuthor.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Document.Manager.Value != null)
                 {
                     sb.Append($" [Manager: {prop.Document.Manager.Value}]");
-
                     prop.Document.Manager.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Keywords.Value != null)
                 {
                     sb.Append($" [Keywords: {string.Join("; ", prop.Keywords.Value)}]");
-
                     prop.Keywords.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Subject.Value != null)
                 {
                     sb.Append($" [Subject: {prop.Subject.Value}]");
-
                     prop.Subject.ClearValue();
-                    modified = true;
                 }
 
                 if (prop.Title.Value != null)
                 {
                     sb.Append($" [Title: {prop.Title.Value}]");
-
                     prop.Title.ClearValue();
-                    modified = true;
                 }
+
             }
             catch (Exception) //catch (Exception ex)
             {
                 _totalErrors++;
                 //sb.Append(" !Unwritable."); //.Append(ex.Message);
-                modified = true;
                 excepted = true;
             }
 
-            if (modified)
+            try
             {
-                try
-                {
-                    fi.LastWriteTime = lastWritten;
-                    _totalClean++;
-                }
-                catch (Exception) //catch (Exception ex)
-                {
-                    if (excepted)
-                    {
-                        sb.Append(" !In use.");
-                    }
-                    else
-                    {
-                        _totalErrors++;
-                        //sb.Append(" !").Append(ex.Message);
-                        sb.Append(" !Unwritable.");
-                    }
-                }
-
-                _log.Enqueue($"\"{fi.FullName}\"{sb}");
-                Console.WriteLine($"  {fi.Name}{sb}");
+                fi.LastWriteTime = lastWritten;
+                _totalClean++;
             }
+            catch (Exception) //catch (Exception ex)
+            {
+                if (excepted)
+                {
+                    sb.Append(" !In use.");
+                }
+                else
+                {
+                    _totalErrors++;
+                    //sb.Append(" !").Append(ex.Message);
+                    sb.Append(" !Unwritable.");
+                }
+            }
+
+            Logger.WriteLine($"\"{fi.FullName}\"{sb}");
+            Console.WriteLine($"  {fi.Name}{sb}");
 
             if (readOnly && _readonly)
             {
                 fi.IsReadOnly = true;
             }
+
+            return Task.CompletedTask;
         }
     }
 }

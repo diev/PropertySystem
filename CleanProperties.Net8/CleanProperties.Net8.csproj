@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+      <Version>8.23.12.06</Version>
+      <Description>Works with the Microsoft Windows Properties System.</Description>
+      <Copyright>Copyright 2022-2023 Dmitrii Evdokimov</Copyright>
+      <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+      <Company>diev</Company>
+      <PublishAot>False</PublishAot>
+      <AssemblyVersion>8.23.12.06</AssemblyVersion>
+      <FileVersion>8.23.12.06</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="iluvadev.ConsoleProgressBar" Version="1.1.0" />
+    <PackageReference Include="Microsoft-WindowsAPICodePack-Shell-6.0" Version="1.1.6" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="if $(ConfigurationName) == Release call $(ProjectDir)PostBuild.bat" Condition=" '$(OS)' == 'Windows_NT' " />
+  </Target>
+
+</Project>

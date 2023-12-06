@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CleanProperties.Net7": {
+      "commandName": "Project",
+      "commandLineArgs": "-batch"
+    }
+  }
+}
