@@ -24,7 +24,7 @@ using Microsoft.WindowsAPICodePack.Shell.PropertySystem;
 
 using static Microsoft.WindowsAPICodePack.Shell.PropertySystem.SystemProperties.System;
 
-namespace CleanProperties.Net8;
+namespace CleanProperties;
 
 public static class ShellPack
 {

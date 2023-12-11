@@ -17,12 +17,10 @@ limitations under the License.
 */
 #endregion
 
-namespace CleanProperties.Net8;
+namespace Diev.Extensions.QueueService;
 
-public sealed class CleanerSettings
+public interface IBackgroundTaskQueue
 {
-    public bool Clean { get; set; }
-    public bool DebugLog { get; set; }
-    public bool HideCommonNames { get; set; }
-    public bool IgnoreReadOnly { get; set; }
+    ValueTask QueueBackgroundWorkItemAsync(Func<CancellationToken, ValueTask> workItem);
+    ValueTask<Func<CancellationToken, ValueTask>> DequeueAsync(CancellationToken cancellationToken);
 }

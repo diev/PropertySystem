@@ -17,14 +17,14 @@ limitations under the License.
 */
 #endregion
 
-namespace CleanProperties.Net8;
+namespace Diev.Extensions.Scan;
 
 public sealed class PathScannerSettings
 {
     // appsettings.json
-    public string[] ScanDirs { get; set; } = Array.Empty<string>(); //new string[] { Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) };
-    public string[] SkipDirs { get; set; } = Array.Empty<string>();
-    public string[] FileMasks { get; set; } = Array.Empty<string>(); //new string[] { "*.doc*", "*.xls*" };
+    public string[] ScanDirs { get; set; } = []; // [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)];
+    public string[] SkipDirs { get; set; } = [];
+    public string[] FileMasks { get; set; } = []; // ["*.doc*", "*.xls*"];
     public bool SkipHiddenDirs { get; set; } = false; // EnumerationOptions.AttributesToSkip
     public bool SkipReadOnlyFiles { get; set; } = false; // EnumerationOptions.AttributesToSkip
     public bool RecurseSubdirectories { get; set; } = false; // EnumerationOptions.RecurseSubdirectories

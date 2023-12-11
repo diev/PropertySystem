@@ -5,14 +5,13 @@
     <TargetFramework>net8.0-windows8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-      <Version>8.23.12.06</Version>
-      <Description>Works with the Microsoft Windows Properties System.</Description>
-      <Copyright>Copyright 2022-2023 Dmitrii Evdokimov</Copyright>
-      <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-      <Company>diev</Company>
-      <PublishAot>False</PublishAot>
-      <AssemblyVersion>8.23.12.06</AssemblyVersion>
-      <FileVersion>8.23.12.06</FileVersion>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>8.23.12.11</Version>
+    <Description>Works with the Microsoft Windows Properties System.</Description>
+    <Copyright>Copyright 2022-2023 Dmitrii Evdokimov</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Company>diev</Company>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,13 +22,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Diev.Extensions\Diev.Extensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="if $(ConfigurationName) == Release call $(ProjectDir)PostBuild.bat" Condition=" '$(OS)' == 'Windows_NT' " />
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(OS)' == 'Windows_NT' and '$(ConfigurationName)' == 'Release'">
+    <Exec Command="call PostBuild.cmd $(ProjectPath)"/>
   </Target>
 
 </Project>

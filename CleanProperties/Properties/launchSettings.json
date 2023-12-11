@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CleanProperties": {
+      "commandName": "Project",
+      "commandLineArgs": "-batch"
+    }
+  }
+}

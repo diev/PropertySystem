@@ -17,7 +17,7 @@ limitations under the License.
 */
 #endregion
 
-namespace CleanProperties.Net8;
+namespace CleanProperties;
 
 public class Helper
 {

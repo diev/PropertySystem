@@ -17,21 +17,12 @@ limitations under the License.
 */
 #endregion
 
-using System.Text;
+namespace CleanProperties;
 
-namespace CleanProperties.Net8;
-
-public sealed class LoggerSettings
+public sealed class CleanerSettings
 {
-    private const int _defaultEncoding = 1251;
-
-    // appsetting.json
-    public string FileNameFormat { get; set; } = @"logs\{0:yyyy}\{0:yyyyMMdd-HHmm}.log";
-    public int FileEncoding { get; set; } = _defaultEncoding;
-    public string LineFormat { get; set; } = @"{0:HH:mm:ss} {1}";
-    public bool LogToConsole { get; set; } = false;
-
-    // internal use
-    public string FileName { get; set; } = "Trace.log";
-    public Encoding EncodingValue { get; set; } = Encoding.GetEncoding(_defaultEncoding);
+    public bool Clean { get; set; }
+    public bool DebugLog { get; set; }
+    public bool HideCommonNames { get; set; }
+    public bool IgnoreReadOnly { get; set; }
 }

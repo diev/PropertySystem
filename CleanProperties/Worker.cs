@@ -18,16 +18,20 @@ limitations under the License.
 #endregion
 
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+
+using Diev.Extensions.Log;
+using Diev.Extensions.Scan;
 
 using iluvadev.ConsoleProgressBar; // https://github.com/iluvadev/ConsoleProgressBar
 
 using Microsoft.Extensions.Configuration;
 
-using static CleanProperties.Net8.ShellPack;
+using static CleanProperties.ShellPack;
 
 using Path = System.IO.Path;
 
-namespace CleanProperties.Net8;
+namespace CleanProperties;
 
 public static class Worker
 {
@@ -123,7 +127,10 @@ public static class Worker
         CleanerSettings cleaner = new();
         config.Bind(nameof(cleaner), cleaner);
 
-        var scanner = new PathScanner(config);
+        var scanner = new PathScanner();
+        config.Bind(nameof(PathScanner), scanner);
+        scanner.Reset();
+
         int filesCounter = 0, cleanCounter = 0, errorsCounter = 0;
 
         foreach (var file in scanner.EnumerateFiles())

@@ -20,9 +20,11 @@ limitations under the License.
 using System.Reflection;
 using System.Text;
 
+using Diev.Extensions.Log;
+
 using Microsoft.Extensions.Configuration;
 
-namespace CleanProperties.Net8;
+namespace CleanProperties;
 
 public class Program
 {
@@ -39,33 +41,36 @@ public class Program
         {
 #endif
 
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            string curDirectory = Directory.GetCurrentDirectory();
-            string appDirectory = Path.GetDirectoryName(Environment.ProcessPath) ?? curDirectory;
+        string curDirectory = Directory.GetCurrentDirectory();
+        string appDirectory = Path.GetDirectoryName(Environment.ProcessPath) ?? curDirectory;
 
 
-            IConfiguration config = new ConfigurationBuilder()
-                .SetBasePath(curDirectory)
-                .AddJsonFile(Path.Combine(appDirectory, _appSettings), true, false)
-                .AddJsonFile(_appSettings, true, false) //CurrentDirectory
-                .Build();
+        IConfiguration config = new ConfigurationBuilder()
+            .SetBasePath(curDirectory)
+            .AddJsonFile(Path.Combine(appDirectory, _appSettings), true, false)
+            .AddJsonFile(_appSettings, true, false) //CurrentDirectory
+            .Build();
+        Logger.Reset();
 
-            Logger.Reset(config);
-
-            result = Worker.DoAction(args, config);
+        result = Worker.DoAction(args, config);
 
 #if !DEBUG
         }
         catch (Exception e)
         {
-            Logger.Settings.LogToConsole = true;
+            Logger.LogToConsole = true;
             Logger.WriteLine("Exception: " + e.Message);
 
             if (e.InnerException != null)
             {
                 Logger.WriteLine("Inner exception: " + e.InnerException.Message);
             }
+
+            string path = Path.Combine(Logger.FilePath, "LastError.txt");
+            var error = $"{e}{Environment.NewLine}{e.InnerException}";
+            File.WriteAllText(path, error);
 
             result = 1;
         }
@@ -84,9 +89,9 @@ public class Program
     public static void Usage()
     {
         var assembly = Assembly.GetExecutingAssembly();
-        string app = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+        var app = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
 
-        string info = @$"{app} v{assembly.GetName().Version.ToString(3)}
+        var info = @$"{app} v{assembly.GetName().Version}
 {assembly.GetCustomAttributes<AssemblyDescriptionAttribute>().FirstOrDefault()?.Description}
 
 Usage: {app} OPTIONS Filename
@@ -120,7 +125,7 @@ Examples:
 OS:        {Environment.OSVersion}
 NET:       {Environment.Version}
 Settings:  ""{Path.Combine(Directory.GetCurrentDirectory(), _appSettings)}""
-Log:       ""{Logger.Settings.FileName}""
+Log:       ""{Logger.FileName}""
 
 Press any key to exit...";
 

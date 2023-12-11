@@ -21,37 +21,58 @@ using System.Runtime.InteropServices;
 
 using Microsoft.Extensions.Configuration;
 
-namespace CleanProperties.Net8;
+namespace Diev.Extensions.Scan;
 
-public class PathScanner
+public partial class PathScanner
 {
     private readonly EnumerationOptions _dirOptions = new(); // { RecurseSubdirectories = Settings.RecurseSubdirectories };
     private readonly EnumerationOptions _fileOptions = new();
 
-    public PathScannerSettings Settings { get; set; } = new();
+    public string CurrentRoot { get; private set; } = Path.DirectorySeparatorChar.ToString();
 
-    public PathScanner(IConfiguration config)
+    public string[] ScanDirs { get; set; } = []; // [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)];
+    public string[] SkipDirs { get; set; } = [];
+    public string[] FileMasks { get; set; } = []; // ["*.doc*", "*.xls*"];
+    public bool SkipHidden { get; set; } = false; // EnumerationOptions.AttributesToSkip
+    public bool SkipReadOnly { get; set; } = false; // EnumerationOptions.AttributesToSkip
+    public bool RecurseSubdirectories { get; set; } = false; // EnumerationOptions.RecurseSubdirectories
+
+    public PathScanner()
     {
-        config.Bind(nameof(PathScanner), Settings);
+    }
 
-        if (!Settings.SkipHiddenDirs)
+    public void Reset()
+    {
+        if (!SkipHidden)
         {
             _dirOptions.AttributesToSkip = default(FileAttributes) | FileAttributes.System;
+            _fileOptions.AttributesToSkip = default(FileAttributes) | FileAttributes.System;
         }
 
-        if (Settings.SkipReadOnlyFiles)
+        if (SkipReadOnly)
         {
+            _dirOptions.AttributesToSkip |= FileAttributes.ReadOnly;
             _fileOptions.AttributesToSkip |= FileAttributes.ReadOnly;
+        }
+
+        CurrentRoot = ScanDirs[0];
+    }
+
+    public static void TestMyDocuments() // Demo of usage
+    {
+        var scanner = new PathScanner()
+        {
+            ScanDirs = [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)]
+        };
+
+        foreach (var file in scanner.EnumerateFiles())
+        {
+            Console.WriteLine(file.DirectoryName);
         }
     }
 
     public IEnumerable<string> EnumerateDirectories(string root)
     {
-        if (Settings.DebugLog)
-        {
-            Logger.WriteNote(root, "...");
-        }
-
         yield return root;
 
         foreach (var dir in Directory.EnumerateDirectories(root, "*", _dirOptions))
@@ -59,35 +80,25 @@ public class PathScanner
             string newDir = dir;
             string name = Path.GetFileName(dir);
 
-            if (name.StartsWith(' ') || name.EndsWith(' ')) // bug of NET
+            if (name.StartsWith(' ') || name.EndsWith(' ')) // bug of NET!
             {
-                Logger.WriteNote(dir, "Error: Dir with spaces!");
-
                 newDir = RemoveSideWhiteSpaces(dir);
 
                 if (Directory.Exists(newDir))
                 {
-                    Logger.WriteNote(newDir, "Error: Dir exists!");
-                    //goto SkipThisDir;
-
                     int i = 1;
-                    while (Directory.Exists($"{newDir} ({++i})")) ;
+                    while (Directory.Exists(newDir + $" ({++i})")) ;
 
                     newDir += $" ({i})";
                 }
 
-                if (RenameDirectoryWithSideWhiteSpaces(dir, newDir))
+                if (!RenameDirectoryWithSideWhiteSpaces(dir, newDir))
                 {
-                    Logger.WriteNote(newDir, "Error: Dir rename new!");
-                }
-                else
-                {
-                    Logger.WriteNote(newDir, "Error: Dir rename fails!");
                     goto SkipThisDir;
                 }
             }
 
-            foreach (var skip in Settings.SkipDirs)
+            foreach (var skip in SkipDirs)
             {
                 if (newDir.StartsWith(skip, StringComparison.InvariantCultureIgnoreCase))
                 {
@@ -95,22 +106,25 @@ public class PathScanner
                 }
             }
 
-        SkipThisDir:
-            
-            foreach (var subdir in EnumerateDirectories(dir))
+            foreach (var subdir in EnumerateDirectories(newDir))
             {
                 yield return subdir;
             }
+
+        SkipThisDir:
+            ;
         }
     }
 
     public IEnumerable<FileInfo> EnumerateFiles()
     {
-        foreach (var root in Settings.ScanDirs)
+        foreach (var root in ScanDirs)
         {
+            CurrentRoot = root;
+
             foreach (var dir in EnumerateDirectories(Path.GetFullPath(root)))
             {
-                foreach (var mask in Settings.FileMasks)
+                foreach (var mask in FileMasks)
                 {
                     foreach (var file in Directory.EnumerateFiles(dir, mask, _fileOptions))
                     {
@@ -123,8 +137,10 @@ public class PathScanner
 
     // https://social.msdn.microsoft.com/Forums/en-US/92f8813f-5dbf-4e67-b8eb-2c91de2a6696/directorynotfoundexception-when-directory-name-ends-with-white-space?forum=csharpgeneral
 
-    [DllImport("kernel32.dll", EntryPoint = "MoveFileW", SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    private static extern bool MoveFile(string lpExistingFileName, string lpNewFileName);
+    [LibraryImport("kernel32.dll", EntryPoint = "MoveFileW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvStdcall) })]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool MoveFile(string lpExistingFileName, string lpNewFileName);
 
     private static bool RenameDirectoryWithSideWhiteSpaces(string path, string newPath)
     {

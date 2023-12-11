@@ -17,8 +17,15 @@ limitations under the License.
 */
 #endregion
 
-namespace CleanProperties.Net8;
+namespace Diev.Extensions.Smtp;
 
-public sealed class ProgramSettings
+public class SmtpSettings
 {
+    public string Host { get; set; }
+    public int Port { get; set; } = 25;
+    public bool UseTls { get; set; }
+    //public string DisplayName { get; set; } = Environment.MachineName;
+    public string UserName { get; set; }
+    public string Password { get; set; }
+    //public List<string> Subscribers { get; set; }
 }
