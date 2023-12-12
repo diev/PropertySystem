@@ -35,7 +35,7 @@ public partial class PathScanner
     /// An array of root directory names to process.
     /// Process the current directory by default.
     /// </summary>
-    public string[] ScanDirs { get; set; } = ["."]; // [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)];
+    public string[] ScanDirs { get; set; } = []; // [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)];
 
     /// <summary>
     /// An array of partial path directory names to skip inner areas.
@@ -47,7 +47,7 @@ public partial class PathScanner
     /// An array of file name masks to process.
     /// Process "*" by default (not "*.*"!).
     /// </summary>
-    public string[] FileMasks { get; set; } = ["*"]; // ["*.doc*", "*.xls*"];
+    public string[] FileMasks { get; set; } = []; // ["*.doc*", "*.xls*"];
 
     /// <summary>
     /// Skip if the hidden attribute is set.
@@ -79,7 +79,6 @@ public partial class PathScanner
 
     public IEnumerable<string> EnumerateDirectories(string root)
     {
-        Console.WriteLine($"root: {root}");
         yield return root;
 
         foreach (var dir in Directory.EnumerateDirectories(root, "*", _dirOptions))
@@ -90,14 +89,12 @@ public partial class PathScanner
             {
                 if (newDir.StartsWith(skip, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    Console.WriteLine($"skip: {skip}");
                     goto SkipThisDir;
                 }
             }
 
             foreach (var subdir in EnumerateDirectories(newDir))
             {
-                Console.WriteLine($"subdir: {subdir}");
                 yield return subdir;
             }
 
@@ -124,20 +121,26 @@ public partial class PathScanner
             _fileOptions.AttributesToSkip |= FileAttributes.ReadOnly;
         }
 
+        if (ScanDirs.Length == 0)
+        {
+            ScanDirs = ["."];
+        }
+
+        if (FileMasks.Length == 0)
+        {
+            FileMasks = ["*"];
+        }
+
         foreach (var root in ScanDirs)
         {
             CurrentRoot = root;
 
             foreach (var dir in EnumerateDirectories(Path.GetFullPath(root)))
             {
-                Console.WriteLine($"dir: {dir}");
-
                 foreach (var mask in FileMasks)
                 {
                     foreach (var file in Directory.EnumerateFiles(dir, mask, _fileOptions))
                     {
-                        Console.WriteLine($"file: {file}");
-
                         yield return new FileInfo(NormalizeNames ? NormalizeName(file) : file);
                     }
                 }
@@ -235,17 +238,18 @@ public partial class PathScanner
         name += ext;
         name2 += ext2;
 
-        string path2 = NextFreeName(Path.Combine(Path.GetDirectoryName(path), name2), folder);
-
         if (!name.Equals(name2, StringComparison.OrdinalIgnoreCase))
         {
+            string path2 = NextFreeName(Path.Combine(Path.GetDirectoryName(path), name2), folder);
+
             if (!RenameWithSideSpaces(path, path2))
             {
                 throw new FileNotFoundException("Path not operable.", path);
             }
+
+            return path2;
         }
 
-        Console.WriteLine($"norm: {path2}");
-        return path2;
+        return path;
     }
 }
