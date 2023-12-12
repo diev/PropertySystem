@@ -19,8 +19,6 @@ limitations under the License.
 
 using System.Runtime.InteropServices;
 
-using Microsoft.Extensions.Configuration;
-
 namespace Diev.Extensions.Scan;
 
 public partial class PathScanner
@@ -28,20 +26,91 @@ public partial class PathScanner
     private readonly EnumerationOptions _dirOptions = new(); // { RecurseSubdirectories = Settings.RecurseSubdirectories };
     private readonly EnumerationOptions _fileOptions = new();
 
+    /// <summary>
+    /// Get the currently processed root directory.
+    /// </summary>
     public string CurrentRoot { get; private set; } = Path.DirectorySeparatorChar.ToString();
 
-    public string[] ScanDirs { get; set; } = []; // [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)];
+    /// <summary>
+    /// An array of root directory names to process.
+    /// Process the current directory by default.
+    /// </summary>
+    public string[] ScanDirs { get; set; } = ["."]; // [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)];
+
+    /// <summary>
+    /// An array of partial path directory names to skip inner areas.
+    /// Empty by default.
+    /// </summary>
     public string[] SkipDirs { get; set; } = [];
-    public string[] FileMasks { get; set; } = []; // ["*.doc*", "*.xls*"];
+
+    /// <summary>
+    /// An array of file name masks to process.
+    /// Process "*" by default (not "*.*"!).
+    /// </summary>
+    public string[] FileMasks { get; set; } = ["*"]; // ["*.doc*", "*.xls*"];
+
+    /// <summary>
+    /// Skip if the hidden attribute is set.
+    /// False by default.
+    /// </summary>
     public bool SkipHidden { get; set; } = false; // EnumerationOptions.AttributesToSkip
+
+    /// <summary>
+    /// Skip if the readonly attribute is set.
+    /// False by default.
+    /// </summary>
     public bool SkipReadOnly { get; set; } = false; // EnumerationOptions.AttributesToSkip
+
+    /// <summary>
+    /// Process recursively.
+    /// This directory only by default.
+    /// </summary>
     public bool RecurseSubdirectories { get; set; } = false; // EnumerationOptions.RecurseSubdirectories
+
+    /// <summary>
+    /// Clean directory/file names from unwanted chars.
+    /// Try to workaround .NET https://github.com/dotnet/runtime/issues/95867 also.
+    /// </summary>
+    public bool NormalizeNames { get; set; } = false;
 
     public PathScanner()
     {
     }
 
-    public void Reset()
+    public IEnumerable<string> EnumerateDirectories(string root)
+    {
+        Console.WriteLine($"root: {root}");
+        yield return root;
+
+        foreach (var dir in Directory.EnumerateDirectories(root, "*", _dirOptions))
+        {
+            string newDir = NormalizeNames ? NormalizeName(dir) : dir;
+
+            foreach (var skip in SkipDirs)
+            {
+                if (newDir.StartsWith(skip, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    Console.WriteLine($"skip: {skip}");
+                    goto SkipThisDir;
+                }
+            }
+
+            foreach (var subdir in EnumerateDirectories(newDir))
+            {
+                Console.WriteLine($"subdir: {subdir}");
+                yield return subdir;
+            }
+
+        SkipThisDir:
+            ;
+        }
+    }
+
+    /// <summary>
+    /// Enumerate all files selected by condition Properties.
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerable<FileInfo> EnumerateFiles()
     {
         if (!SkipHidden)
         {
@@ -55,80 +124,21 @@ public partial class PathScanner
             _fileOptions.AttributesToSkip |= FileAttributes.ReadOnly;
         }
 
-        CurrentRoot = ScanDirs[0];
-    }
-
-    public static void TestMyDocuments() // Demo of usage
-    {
-        var scanner = new PathScanner()
-        {
-            ScanDirs = [Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)]
-        };
-
-        foreach (var file in scanner.EnumerateFiles())
-        {
-            Console.WriteLine(file.DirectoryName);
-        }
-    }
-
-    public IEnumerable<string> EnumerateDirectories(string root)
-    {
-        yield return root;
-
-        foreach (var dir in Directory.EnumerateDirectories(root, "*", _dirOptions))
-        {
-            string newDir = dir;
-            string name = Path.GetFileName(dir);
-
-            if (name.StartsWith(' ') || name.EndsWith(' ')) // bug of NET!
-            {
-                newDir = RemoveSideWhiteSpaces(dir);
-
-                if (Directory.Exists(newDir))
-                {
-                    int i = 1;
-                    while (Directory.Exists(newDir + $" ({++i})")) ;
-
-                    newDir += $" ({i})";
-                }
-
-                if (!RenameDirectoryWithSideWhiteSpaces(dir, newDir))
-                {
-                    goto SkipThisDir;
-                }
-            }
-
-            foreach (var skip in SkipDirs)
-            {
-                if (newDir.StartsWith(skip, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    goto SkipThisDir;
-                }
-            }
-
-            foreach (var subdir in EnumerateDirectories(newDir))
-            {
-                yield return subdir;
-            }
-
-        SkipThisDir:
-            ;
-        }
-    }
-
-    public IEnumerable<FileInfo> EnumerateFiles()
-    {
         foreach (var root in ScanDirs)
         {
             CurrentRoot = root;
 
             foreach (var dir in EnumerateDirectories(Path.GetFullPath(root)))
             {
+                Console.WriteLine($"dir: {dir}");
+
                 foreach (var mask in FileMasks)
                 {
                     foreach (var file in Directory.EnumerateFiles(dir, mask, _fileOptions))
                     {
-                        yield return new FileInfo(file);
+                        Console.WriteLine($"file: {file}");
+
+                        yield return new FileInfo(NormalizeNames ? NormalizeName(file) : file);
                     }
                 }
             }
@@ -142,23 +152,100 @@ public partial class PathScanner
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool MoveFile(string lpExistingFileName, string lpNewFileName);
 
-    private static bool RenameDirectoryWithSideWhiteSpaces(string path, string newPath)
+    private static bool RenameWithSideSpaces(string path, string newPath)
     {
-        var oldPath = @"\\?\" + path;
-        var result = MoveFile(oldPath, newPath);
-
-        return result;
+        return MoveFile(PrefixPath(path), newPath);
     }
 
-    private static string RemoveSideWhiteSpaces(string path)
+    private static string PrefixPath(string path)
     {
-        //var parent = Path.GetDirectoryName(path);
-        //var name = Path.GetFileName(path);
-        //var result = Path.Combine(parent ?? Path.GetPathRoot(path), name.Trim());
+        return path.StartsWith(@"\\?\", StringComparison.Ordinal) ? path : @"\\?\" + path;
+    }
 
-        var breadcrumbs = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Select(x => x.Trim()).ToArray();
-        var result = string.Join(Path.DirectorySeparatorChar, breadcrumbs);
+    private static string NextFreeName(string path, bool folder = false)
+    {
+        string name = Path.ChangeExtension(path, null); 
+        string ext = Path.GetExtension(path);
+        int i = 1;
 
-        return result;
+        if (folder)
+        {
+            if (!Directory.Exists(path))
+            {
+                return path;
+            }
+
+            while (Directory.Exists($"{name} ({++i}){ext}"))
+                ;
+        }
+        else
+        { 
+            if (!File.Exists(path))
+            {
+                return path;
+            }
+
+            while (File.Exists($"{name} ({++i}){ext}")) //TODO "Name (2) (2).txt" => "Name (3).txt"
+                ;
+        }
+
+        return $"{name} ({i}){ext}";
+    }
+
+    private static string NormalizeName(string path, bool folder = false)
+    {
+        string name = Path.GetFileNameWithoutExtension(path);
+        string ext = Path.GetExtension(path);
+
+        if (path.EndsWith('.')) // a bug of .NET to lost the last dot if any
+        {
+            name += '.';
+        }
+
+        string name2 = name;
+        string ext2 = ext;
+
+        if (name2.Contains(' '))
+        {
+            name2 = name2.Trim();
+            while (name2.Contains("  "))
+                name2 = name2.Replace("  ", " ");
+            while (name2.Contains(" ,"))
+                name2 = name2.Replace(" ,", ",");
+            while (name2.Contains("( "))
+                name2 = name2.Replace("( ", "(");
+            while (name2.Contains(" )"))
+                name2 = name2.Replace(" )", ")");
+        }
+
+        if (name2.Contains('.'))
+        {
+            while (name2.Contains(".."))
+                name2 = name2.Replace("..", ".");
+            while (name2.EndsWith('.'))
+                name2 = name2[..^1];
+        }
+
+        if (ext2.Contains(' '))
+        {
+            ext2 = ext2[1..].Trim();
+            ext2 = '.' + string.Join(' ', ext2.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        name += ext;
+        name2 += ext2;
+
+        string path2 = NextFreeName(Path.Combine(Path.GetDirectoryName(path), name2), folder);
+
+        if (!name.Equals(name2, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!RenameWithSideSpaces(path, path2))
+            {
+                throw new FileNotFoundException("Path not operable.", path);
+            }
+        }
+
+        Console.WriteLine($"norm: {path2}");
+        return path2;
     }
 }

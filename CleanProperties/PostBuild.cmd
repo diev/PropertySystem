@@ -35,7 +35,7 @@ set AddDirNames=Diev.Extensions
 
 echo === Pack sources ===
 
-set SrcPack=%ProjectName%-v%Ver%-(%Ymd%)-src.zip
+set SrcPack=%ProjectName%-v%Ver%-src.zip
 
 echo Pack sources to %SrcPack%
 
@@ -61,7 +61,7 @@ echo === Pack binaries ===
 
 cd Distr
 copy ..\version.txt
-set BinPack=%ProjectName%-v%Ver%-(%Ymd%).zip
+set BinPack=%ProjectName%-v%Ver%.zip
 if exist ..\..\%BinPack% del ..\..\%BinPack%
 
 echo Pack binary application to %BinPack%
@@ -106,7 +106,10 @@ goto :eof
 
 :version_txt
 call :lower RepoLName %RepoName%
-echo %ProjectName% v%Ver% (%Ymd%)
+echo %ProjectName%
+echo.
+echo Version: v%Ver%
+echo Date:    %Ymd%
 echo.
 echo https://github.com/diev/%RepoName%
 echo https://gitflic.ru/project/diev/%RepoLName%

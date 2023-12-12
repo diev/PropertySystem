@@ -18,7 +18,6 @@ limitations under the License.
 #endregion
 
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 
 using Diev.Extensions.Log;
 using Diev.Extensions.Scan;
@@ -129,7 +128,6 @@ public static class Worker
 
         var scanner = new PathScanner();
         config.Bind(nameof(PathScanner), scanner);
-        scanner.Reset();
 
         int filesCounter = 0, cleanCounter = 0, errorsCounter = 0;
 
