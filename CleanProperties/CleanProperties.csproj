@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <Version>8.2023.12.12</Version>
+    <Version>8.2023.12.13</Version>
     <Description>Works with the Microsoft Windows Properties System.</Description>
     <Copyright>Copyright 2022-2023 Dmitrii Evdokimov</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>

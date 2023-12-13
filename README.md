@@ -1,10 +1,16 @@
-# CleanAuthors
+# CleanProperties
 
-Clean Microsoft Office metadata. Очистка метаданных из офисных файлов (Авторы, Компания, Название и т.п.)
+Scan users' files storage,
+fix wrong directory/file names,
+clean Microsoft Office metadata.
+
+Сканирование хранилища пользовательских файлов,
+исправление именования папок и файлов,
+очистка метаданных из офисных файлов (Авторы, Компания, Название и т.п.)
 
 ## Requirements
 
-- .NET 8
+- .NET 8 Desktop Runtime
 
 ## License
 

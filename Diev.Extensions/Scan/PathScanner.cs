@@ -18,6 +18,8 @@ limitations under the License.
 #endregion
 
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Diev.Extensions.Scan;
 
@@ -141,7 +143,12 @@ public partial class PathScanner
                 {
                     foreach (var file in Directory.EnumerateFiles(dir, mask, _fileOptions))
                     {
-                        yield return new FileInfo(NormalizeNames ? NormalizeName(file) : file);
+                        string path = NormalizeNames ? NormalizeName(file) : file;
+
+                        if (File.Exists(path)) // wonderful but real!
+                        {
+                            yield return new FileInfo(path);
+                        }
                     }
                 }
             }
@@ -195,6 +202,63 @@ public partial class PathScanner
         return $"{name} ({i}){ext}";
     }
 
+    /// <summary>
+    /// Creates a new free file name to rename the source file if its content differs.
+    /// </summary>
+    /// <param name="path">Source filename.</param>
+    /// <param name="tryPath">Proposed filename to check.</param>
+    /// <param name="newPath">Destination filename to rename.</param>
+    /// <returns>Rename required (no same files by content found).</returns>
+    private static bool TryNextFreeName(string path, string tryPath, out string newPath)
+    {
+        newPath = tryPath;
+
+        if (!File.Exists(tryPath))
+        {
+            // proposed filename is free - rename to it correctly
+            return true;
+        }
+
+        var hash = GetFileHash(path);
+        var tryHash = GetFileHash(tryPath);
+
+        if (tryHash.SequenceEqual(hash)) // tryHash.Equals(hash) and == do not work!
+        {
+            // proposed filename has same content - delete bad source, rename not required
+            File.Delete(path);
+
+            return false;
+        }
+
+        string name = Path.ChangeExtension(tryPath, null);
+        string ext = Path.GetExtension(tryPath);
+        int i = 1;
+
+        while (File.Exists($"{name} ({++i}){ext}")) //TODO "Name (2) (2).txt" => "Name (3).txt"
+        {
+            newPath = $"{name} ({i}){ext}";
+            var newHash = GetFileHash(newPath);
+
+            if (newHash.SequenceEqual(hash))
+            {
+                // calculated filename has same content - delete bad source, rename not required
+                File.Delete(path);
+
+                return false;
+            }
+        }
+
+        // rename required
+        return true;
+    }
+
+    /// <summary>
+    /// Get a new normalized directory/file name.
+    /// </summary>
+    /// <param name="path">Directory/file name.</param>
+    /// <param name="folder">True if directory, false if file (default).</param>
+    /// <returns>Normalized name.</returns>
+    /// <exception cref="FileNotFoundException"></exception>
     private static string NormalizeName(string path, bool folder = false)
     {
         string name = Path.GetFileNameWithoutExtension(path);
@@ -240,16 +304,54 @@ public partial class PathScanner
 
         if (!name.Equals(name2, StringComparison.OrdinalIgnoreCase))
         {
-            string path2 = NextFreeName(Path.Combine(Path.GetDirectoryName(path), name2), folder);
+            // names are different - rename required
 
-            if (!RenameWithSideSpaces(path, path2))
+            name2 = Path.Combine(Path.GetDirectoryName(path), name2);
+
+            if (folder)
             {
-                throw new FileNotFoundException("Path not operable.", path);
-            }
+                string path2 = NextFreeName(name2, folder); //TODO try to find same ready directory (by comparing all trees and all contents?)
 
-            return path2;
+                if (!RenameWithSideSpaces(path, path2))
+                {
+                    throw new FileNotFoundException("Directory path not operable.", path);
+                }
+
+                // new folder name
+                return path2;
+            }
+            else if (TryNextFreeName(path, name2, out string path2)) // try to find same ready file
+            {
+                if (!RenameWithSideSpaces(path, path2))
+                {
+                    throw new FileNotFoundException("File path not operable.", path);
+                }
+
+                // not found - return new filename
+                return path2;
+            }
+            else // found same ready file
+            {
+                // return good named existing filename (bad source is deleted)
+                return path2;
+            }
         }
 
+        // return as is - no rename required
         return path;
+    }
+
+    /// <summary>
+    /// Calculates the hash of a file to compare later.
+    /// </summary>
+    /// <param name="file1">File to calc.</param>
+    /// <returns>Comparable string value of hash.</returns>
+    private static byte[] GetFileHash(string file)
+    {
+        using var hasher = SHA1.Create(); // MD5.Create()
+        using var stream = File.OpenRead(PrefixPath(file));
+        var hash = hasher.ComputeHash(stream);
+
+        return hash;
     }
 }

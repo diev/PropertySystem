@@ -23,7 +23,8 @@ for %%i in (..) do (
  set RepoName=%%~nxi
 )
 rem Version X.X.X.X
-for /f "tokens=3 delims=<>" %%v in ('findstr "<Version>" %ProjectPath%') do set Ver=%%v
+for /f "tokens=3 delims=<>" %%v in ('findstr "<Version>" %ProjectPath%') do set Version=%%v
+for /f "tokens=3 delims=<>" %%v in ('findstr "<Description>" %ProjectPath%') do set Description=%%v
 rem Date yyyy-mm-dd
 set Ymd=%date:~-4%-%date:~3,2%-%date:~0,2%
 
@@ -35,13 +36,14 @@ set AddDirNames=Diev.Extensions
 
 echo === Pack sources ===
 
-set SrcPack=%ProjectName%-v%Ver%-src.zip
+set SrcPack=%ProjectName%-v%Version%-src.zip
 
 echo Pack sources to %SrcPack%
 
 pushd ..
 set Packer="C:\Program Files\7-Zip\7z.exe" a -tzip %SrcPack% -xr!bin -xr!obj
 if exist %SrcPack% del %SrcPack%
+%Packer% *.sln *.md LICENSE
 call :pack %ProjectDirName% %AddDirNames%
 
 echo === Test build ===
@@ -61,7 +63,7 @@ echo === Pack binaries ===
 
 cd Distr
 copy ..\version.txt
-set BinPack=%ProjectName%-v%Ver%.zip
+set BinPack=%ProjectName%-v%Version%.zip
 if exist ..\..\%BinPack% del ..\..\%BinPack%
 
 echo Pack binary application to %BinPack%
@@ -107,8 +109,9 @@ goto :eof
 :version_txt
 call :lower RepoLName %RepoName%
 echo %ProjectName%
+echo %Description%
 echo.
-echo Version: v%Ver%
+echo Version: v%Version%
 echo Date:    %Ymd%
 echo.
 echo https://github.com/diev/%RepoName%

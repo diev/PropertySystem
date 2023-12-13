@@ -17,6 +17,7 @@ limitations under the License.
 */
 #endregion
 
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text;
 
@@ -69,8 +70,8 @@ public class Program
             }
 
             string path = Path.Combine(Logger.FilePath, "LastError.txt");
-            var error = $"{e}{Environment.NewLine}{e.InnerException}";
-            File.WriteAllText(path, error);
+            var error = $"--- {DateTime.Now} ---{Environment.NewLine}{e}{Environment.NewLine}{e.InnerException}{Environment.NewLine}";
+            File.AppendAllText(path, error);
 
             result = 1;
         }
