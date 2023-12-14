@@ -21,6 +21,8 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
+using Diev.Extensions.Log;
+
 namespace Diev.Extensions.Scan;
 
 public partial class PathScanner
@@ -143,7 +145,20 @@ public partial class PathScanner
                 {
                     foreach (var file in Directory.EnumerateFiles(dir, mask, _fileOptions))
                     {
-                        string path = NormalizeNames ? NormalizeName(file) : file;
+                        string path = file;
+
+                        if (NormalizeNames)
+                        {
+                            try
+                            {
+                                path = NormalizeName(file);
+                            }
+                            catch (Exception e)
+                            {
+                                Logger.LastError(e);
+                                continue;
+                            }
+                        }
 
                         if (File.Exists(path)) // wonderful but real!
                         {
@@ -234,9 +249,10 @@ public partial class PathScanner
         string ext = Path.GetExtension(tryPath);
         int i = 1;
 
-        while (File.Exists($"{name} ({++i}){ext}")) //TODO "Name (2) (2).txt" => "Name (3).txt"
+        newPath = $"{name} ({++i}){ext}";
+
+        while (File.Exists(newPath)) //TODO "Name (2) (2).txt" => "Name (3).txt"
         {
-            newPath = $"{name} ({i}){ext}";
             var newHash = GetFileHash(newPath);
 
             if (newHash.SequenceEqual(hash))
@@ -246,6 +262,8 @@ public partial class PathScanner
 
                 return false;
             }
+
+            newPath = $"{name} ({++i}){ext}";
         }
 
         // rename required
@@ -295,8 +313,8 @@ public partial class PathScanner
 
         if (ext2.Contains(' '))
         {
-            ext2 = ext2[1..].Trim();
-            ext2 = '.' + string.Join(' ', ext2.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            ext2 = string.Join(' ', ext2.TrimEnd()
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
         }
 
         name += ext;

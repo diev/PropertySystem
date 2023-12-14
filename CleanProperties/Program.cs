@@ -61,17 +61,7 @@ public class Program
         }
         catch (Exception e)
         {
-            Logger.LogToConsole = true;
-            Logger.WriteLine("Exception: " + e.Message);
-
-            if (e.InnerException != null)
-            {
-                Logger.WriteLine("Inner exception: " + e.InnerException.Message);
-            }
-
-            string path = Path.Combine(Logger.FilePath, "LastError.txt");
-            var error = $"--- {DateTime.Now} ---{Environment.NewLine}{e}{Environment.NewLine}{e.InnerException}{Environment.NewLine}";
-            File.AppendAllText(path, error);
+            Logger.LastError(e);
 
             result = 1;
         }
